@@ -1,0 +1,23 @@
+[Unit]
+Description=Raajje Rewind backend (FastAPI / uvicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=raajje
+Group=raajje
+WorkingDirectory=/srv/raajje-rewind/backend
+EnvironmentFile=/srv/raajje-rewind/backend/.env
+ExecStart=/srv/raajje-rewind/backend/.venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/raajje-rewind/backend/chroma_db
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,24 @@
+[Unit]
+# Optional: only needed if you serve the built frontend via Node instead of nginx.
+# For production, nginx (see deploy/nginx/) is recommended — it handles TLS,
+# gzip/brotli, and static file caching better than `serve`. Pick one path.
+Description=Raajje Rewind frontend (static SPA via serve)
+After=network.target
+
+[Service]
+Type=simple
+User=raajje
+Group=raajje
+WorkingDirectory=/srv/raajje-rewind/frontend
+# Requires `serve` to be installed: `npm install -g serve` (or add it as a dep).
+ExecStart=/usr/bin/serve -s dist -l tcp://127.0.0.1:5173
+Restart=on-failure
+RestartSec=5
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

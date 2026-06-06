@@ -1,22 +1,63 @@
 # /etc/nginx/sites-available/raajje-rewind
-# Symlink into sites-enabled/ then `nginx -t && systemctl reload nginx`.
-# Pair with certbot --nginx for TLS.
+# Designed to sit behind Cloudflare with SSL/TLS = Full (Strict).
+# Origin TLS uses a Cloudflare Origin Certificate (free, 15-year validity).
+# Generate via Cloudflare dashboard → SSL/TLS → Origin Server → Create Certificate.
 
+# --- Trust Cloudflare's edge for real client IPs ---
+# Refresh from https://www.cloudflare.com/ips/ when CF announces new ranges.
+set_real_ip_from 173.245.48.0/20;
+set_real_ip_from 103.21.244.0/22;
+set_real_ip_from 103.22.200.0/22;
+set_real_ip_from 103.31.4.0/22;
+set_real_ip_from 141.101.64.0/18;
+set_real_ip_from 108.162.192.0/18;
+set_real_ip_from 190.93.240.0/20;
+set_real_ip_from 188.114.96.0/20;
+set_real_ip_from 197.234.240.0/22;
+set_real_ip_from 198.41.128.0/17;
+set_real_ip_from 162.158.0.0/15;
+set_real_ip_from 104.16.0.0/13;
+set_real_ip_from 104.24.0.0/14;
+set_real_ip_from 172.64.0.0/13;
+set_real_ip_from 131.0.72.0/22;
+set_real_ip_from 2400:cb00::/32;
+set_real_ip_from 2606:4700::/32;
+set_real_ip_from 2803:f800::/32;
+set_real_ip_from 2405:b500::/32;
+set_real_ip_from 2405:8100::/32;
+set_real_ip_from 2a06:98c0::/29;
+set_real_ip_from 2c0f:f248::/32;
+real_ip_header CF-Connecting-IP;
+
+# --- Redirect HTTP → HTTPS so anyone hitting the origin directly upgrades ---
 server {
     listen 80;
-    server_name raajje-rewind.example.com;
+    listen [::]:80;
+    server_name raajje-rewind.example.xyz;
+    return 301 https://$host$request_uri;
+}
 
-    # Serve the built SPA.
+# --- Main HTTPS vhost ---
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl http2;
+    server_name raajje-rewind.example.xyz;
+
+    ssl_certificate     /etc/ssl/cloudflare/origin.pem;
+    ssl_certificate_key /etc/ssl/cloudflare/origin.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers off;
+
     root /srv/raajje-rewind/frontend/dist;
     index index.html;
 
-    # PWA service worker — never cache it, so updates roll out immediately.
+    # PWA service worker — never cache so updates roll out immediately.
     location = /sw.js {
         add_header Cache-Control "no-cache";
         try_files $uri =404;
     }
 
-    # Hashed asset bundles can be cached aggressively.
+    # Hashed asset bundles — safe to cache hard.
     location /assets/ {
         expires 1y;
         add_header Cache-Control "public, immutable";

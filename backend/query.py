@@ -9,7 +9,7 @@ logger = logging.getLogger("uvicorn.error")
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 GEMINI_MODEL = "gemini-3.1-flash-lite"
-TOP_K = 5
+TOP_K = 6
 HISTORY_TURNS = 6  # Last N user/assistant turns to send to the model.
 
 client = genai.Client(api_key=GEMINI_API_KEY)
@@ -33,17 +33,50 @@ Rules:
 """
 
 
+REWRITE_PROMPT = """You rewrite a student's question into a search query for a database of Maldivian social-studies textbooks (English).
+
+Given the conversation so far and the student's latest question, produce a single, self-contained search query.
+- Fix spelling and capitalization of names and places (e.g. "shamsudeen" -> "Shamsuddeen", "thakurufan" -> "Thakurufaanu").
+- Expand partial names or titles to the most likely full form when the textbook context makes it clear (e.g. "shamsuddeen" -> "Sultan Shamsuddeen III").
+- Resolve pronouns and references ("he", "that", "then", "after that") using the conversation so the query stands on its own.
+- Keep it short — just the key terms a search would need, no extra words.
+
+Output ONLY the rewritten search query, with no quotes, labels, or explanation."""
+
+
+def _rewrite_query(question: str, history: list[HistoryTurn]) -> str | None:
+    """Use the model to normalize the question into a clean search query:
+    fix spelling/casing, expand partial names, resolve pronouns. Returns None
+    on any failure so retrieval can fall back to the raw question."""
+    convo = "\n".join(f"{turn.role}: {turn.content}" for turn in history)
+    prompt = (
+        f"Conversation so far:\n{convo}\n\n" if convo else ""
+    ) + f"Latest question: {question}"
+    try:
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=[{"role": "user", "parts": [{"text": prompt}]}],
+            config={
+                "system_instruction": REWRITE_PROMPT,
+                "temperature": 0,
+            },
+        )
+        rewritten = (response.text or "").strip()
+        return rewritten or None
+    except Exception:
+        logger.exception("query rewrite failed; falling back to raw question")
+        return None
+
+
 def _retrieval_queries(question: str, history: list[HistoryTurn]) -> list[str]:
-    """Return one or two retrieval queries: the standalone question, plus a
-    contextualized variant if a prior user turn exists. Two queries are merged
-    downstream so short follow-ups still find their topic."""
+    """Return the raw question plus a model-rewritten search query (spelling
+    fixed, names expanded, pronouns resolved). Both are merged downstream so a
+    terse or misspelled question still finds its topic, while the raw text is
+    kept as a safety net if the rewrite drifts."""
     queries = [question]
-    prev_user = next(
-        (h.content for h in reversed(history) if h.role == "user"),
-        None,
-    )
-    if prev_user:
-        queries.append(f"{prev_user} {question}")
+    rewritten = _rewrite_query(question, history)
+    if rewritten and rewritten.lower() != question.lower():
+        queries.append(rewritten)
     return queries
 
 
@@ -78,10 +111,10 @@ def answer_question(question: str, history: list[HistoryTurn] | None = None) -> 
     chunks, metadatas = _retrieve(queries)
 
     logger.info(
-        "ask: q=%r history=%d queries=%d chunks=%d sources=%s",
+        "ask: q=%r queries=%r history=%d chunks=%d sources=%s",
         question,
+        queries,
         len(history),
-        len(queries),
         len(chunks),
         sorted({m.get("source", "?") for m in metadatas}),
     )

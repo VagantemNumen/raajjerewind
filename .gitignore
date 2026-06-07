@@ -20,6 +20,9 @@ dist/
 dist-ssr/
 .vite/
 
+# npm home used by deploy/update.sh (keeps npm's cache out of the repo root)
+/.npm-home/
+
 # Editor / OS
 .DS_Store
 Thumbs.db

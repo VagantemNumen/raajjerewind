@@ -27,17 +27,20 @@ main() {
   local run_as="raajje"
   local service="raajje-rewind-backend"
   local venv_pip="$app_dir/backend/.venv/bin/pip"
+  # Dedicated, gitignored home for npm so its cache doesn't litter the repo root.
+  local npm_home="$app_dir/.npm-home"
 
   # Run a command as the app owner.
   run() { sudo -u "$run_as" "$@"; }
 
   echo "==> Repo: $app_dir"
 
-  # Refuse to run on a dirty tree — uncommitted edits in /srv would either be
-  # clobbered or block the checkout. Surface it instead of guessing.
-  if [[ -n "$(run git -C "$app_dir" status --porcelain)" ]]; then
-    echo "!! Working tree at $app_dir has local changes. Resolve them first:" >&2
-    run git -C "$app_dir" status --short >&2
+  # Refuse to run if tracked files have uncommitted edits — those are what a
+  # fast-forward pull would conflict with. Untracked files (build caches,
+  # chroma_db, .env) are ignored here; git still protects them on checkout.
+  if [[ -n "$(run git -C "$app_dir" status --porcelain --untracked-files=no)" ]]; then
+    echo "!! Working tree at $app_dir has uncommitted changes. Resolve them first:" >&2
+    run git -C "$app_dir" status --short --untracked-files=no >&2
     exit 1
   fi
 
@@ -48,9 +51,11 @@ main() {
   run "$venv_pip" install --quiet --requirement "$app_dir/backend/requirements.txt"
 
   echo "==> Building frontend"
-  # HOME is set so npm's cache lands somewhere raajje can write (it owns app_dir).
-  run env HOME="$app_dir" npm --prefix "$app_dir/frontend" ci
-  run env HOME="$app_dir" npm --prefix "$app_dir/frontend" run build
+  # HOME points at a dedicated gitignored dir so npm's cache (.npm, .cache) lands
+  # somewhere raajje can write without polluting the repo root.
+  run mkdir -p "$npm_home"
+  run env HOME="$npm_home" npm --prefix "$app_dir/frontend" ci
+  run env HOME="$npm_home" npm --prefix "$app_dir/frontend" run build
 
   echo "==> Restarting backend"
   sudo systemctl restart "$service"

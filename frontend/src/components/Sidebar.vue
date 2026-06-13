@@ -109,6 +109,13 @@ function onDelete(e: Event, id: string) {
               <span v-if="mode === opt.value" class="text-xs">✓</span>
             </button>
           </li>
+          <li class="menu-title px-2 pb-1 pt-2 text-xs">About</li>
+          <li>
+            <RouterLink to="/welcome" class="flex items-center gap-2">
+              <span aria-hidden="true">✦</span>
+              Welcome screen
+            </RouterLink>
+          </li>
         </ul>
       </div>
     </div>

@@ -56,7 +56,7 @@ async function doLogout() {
         <p class="text-xs opacity-60">Manage ingested documents.</p>
       </div>
       <div class="flex items-center gap-2">
-        <RouterLink to="/" class="link link-hover text-sm opacity-70">← Back to chat</RouterLink>
+        <RouterLink to="/chat" class="link link-hover text-sm opacity-70">← Back to chat</RouterLink>
         <button
           v-if="isAuthed"
           type="button"

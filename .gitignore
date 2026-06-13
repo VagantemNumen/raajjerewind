@@ -20,6 +20,10 @@ dist/
 dist-ssr/
 .vite/
 
+# Dev local items
+.notes/
+*.local.*
+
 # npm home used by deploy/update.sh (keeps npm's cache out of the repo root)
 /.npm-home/
 

@@ -20,6 +20,12 @@ dist/
 dist-ssr/
 .vite/
 
+# Capacitor native projects — regenerate with `npm run cap:add:android` /
+# `cap:add:ios`. Kept out of git to stay lightweight; config lives in
+# frontend/capacitor.config.ts.
+frontend/android/
+frontend/ios/
+
 # Dev local items
 .notes/
 *.local.*
